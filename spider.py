@@ -94,7 +94,7 @@ import pynlpir
 def parse_words(s):
 	pynlpir.open()
 	#print(type(s))#<class 'str'>
-	print(s)
+	#print(s)
 	key_words = pynlpir.get_key_words(s, weighted=True)
 	pynlpir.close()
 	return key_words
@@ -131,8 +131,11 @@ def get_and_save_top_keywords(songid):
 				dic_keywords.update({key_word[0]: dic_keywords.get(key_word[0], 0) + key_word[1]})
 		except Exception as e:
 			print('comment解析失败：',i,comment)
+			print(e)
 		else:
 			print("comment解析成功:",i,comment)
+		finally:
+			print()
 	print('所有评论的解析与保存已完成')
 	print(sorted(dic2str(dic_keywords)))
 	top_keywords = list(sorted(dic2str(dic_keywords), key=lambda x: -x[1]))[:10]
