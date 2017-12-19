@@ -16,24 +16,24 @@ class ChooseApp(Tk):
 		#self.geometry('300x500')
 		# 在root内创建第1行……
 		row1 = Frame(self)
-		row1.pack(fill="x",side=LEFT)
-		Label(row1, text='找到相关歌曲'+str(len(song_lst))+'首，请选择：', width=28).pack(side=LEFT)
+		row1.pack(fill="x",side=TOP)
+		Label(row1, text='找到相关歌曲'+str(len(song_lst))+'首，请选择：', width=28,font=("黑体", 16, "bold")).pack(side=LEFT)
 		#第2行
 		row2 = Frame(self)
-		row2.pack(fill="x")
+		row2.pack(fill="x",side=BOTTOM)
 		self.r = StringVar()
 		#self.r保存选择结果
 		for i,song in enumerate(song_lst):
 			print(i,song)
 			#value是当前选项的特征值
-			self.radio = Radiobutton(self, variable=self.r, value=i, text='{0}：{1} by {2}({3})'.format(i,song[1],song[2],song[3]),command=self.sel,activebackground='Lavender',activeforeground='grey',bg='ghostwhite',fg='Orchid')
+			self.radio = Radiobutton(self, variable=self.r, value=i, text='{0}：{1} by {2}({3})'.format(i,song[1],song[2],song[3]),command=self.sel,activebackground='Lavender',activeforeground='grey',bg='ghostwhite',fg='Black')
 			#正常情况下：字体颜色fg，背景色bg
 			#选中：字体activeforeground，背景activebackground
-			self.radio.pack()
+			#self.radio.pack(side=LEFT)#所有歌曲排成一行
+			self.radio.pack(anchor=W)#锚选项，当可用空间大于所需求的尺寸时，决定组件被放置于容器的何处
+
 
 		#第三行
-		row3 = Frame(self)
-		row3.pack(fill="x")
 		Button(row1, text="取消", command=self.cancel).pack(side=RIGHT)
 		Button(row1, text="提交", command=self.ok).pack(side=RIGHT)
 		#第4行，
@@ -62,7 +62,7 @@ def users_choice(song_lst):
 def find_songname(songname):
 	browser = webdriver.Chrome()
 	#最小化窗口，因为用户不关心过程
-	browser.minimize_window()
+	#browser.minimize_window()报错Message: unknown command: session/67b6fb8a56cad99cc5646646267e71c4/window/minimize
 	url = 'http://music.163.com/#/search/m/'
 	browser.get(url)
 	#先定位到g-iframe这个frame
