@@ -190,11 +190,51 @@ def save_to_keywords(songid, top_keywords):
 	cursor.close()
 
 
+def get_songid_by_name(songname):
+	headers = {
+		'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
+	for i in range(10):
+		# 一个i获取10个评论
+		text = {
+			'username': '',
+			'password': '',
+			'rememberLogin': 'true',
+			'keywords':songname
+		}
+		text = json.dumps(text)
+		secKey = createSecretKey(16)
+		encText = aesEncrypt(aesEncrypt(text, nonce), secKey)
+		encSecKey = rsaEncrypt(secKey, pubKey, modulus)
+		payload = {
+			'params': encText,
+			'encSecKey': encSecKey
+		}
+		url='http://music.163.com/weapi/search/suggest/web?csrf_token='
+		r = requests.post(url, headers=headers, data=payload)
+		r.raise_for_status()
+		print(r.headers)
+		print(r.text)
+		# 把返回的json格式转换成字典，方便提取关键字
+
+		try:
+			r_dic = json.loads(r.text)
+		except:
+			print("json.loads(r.text)出错了")
+		print(r_dic)
+		#comments = r_dic["comments"]
+		print()
+
+
+
+
+
 if __name__ == '__main__':
 	# 在数据库中新建两张表，comments和keywords
 	print("下面载数据库中新建两张表")
 	init_tables()
 	print("下面开始主流程")
+	songname='鼓楼'
+	songid=get_songid_by_name(songname)
 	songid = '447926067'
 
 	top_keywords = get_and_save_top_keywords(songid)
