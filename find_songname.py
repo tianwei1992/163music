@@ -4,57 +4,38 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 import time
 
-class ChooseApp(Tk):
-	def __init__(self,song_lst):
-		super().__init__()
-		self.sonng_lst=song_lst
-		self.seq=IntVar()
-		self.title('input_sequence')
-		self.resizable(1, 0)  # 不懂
-		self.setup_UI(song_lst)
-	def setup_UI(self,song_lst):
-		#self.geometry('300x500')
-		# 在root内创建第1行……
-		row1 = Frame(self)
-		row1.pack(fill="x",side=TOP)
-		Label(row1, text='找到相关歌曲'+str(len(song_lst))+'首，请选择：', width=28,font=("黑体", 16, "bold")).pack(side=LEFT)
-		#第2行
-		row2 = Frame(self)
-		row2.pack(fill="x",side=BOTTOM)
-		self.r = StringVar()
-		#self.r保存选择结果
-		for i,song in enumerate(song_lst):
-			print(i,song)
-			#value是当前选项的特征值
-			self.radio = Radiobutton(self, variable=self.r, value=i, text='{0}：{1} by {2}({3})'.format(i,song[1],song[2],song[3]),command=self.sel,activebackground='Lavender',activeforeground='grey',bg='ghostwhite',fg='Black')
-			#正常情况下：字体颜色fg，背景色bg
-			#选中：字体activeforeground，背景activebackground
-			#self.radio.pack(side=LEFT)#所有歌曲排成一行
-			self.radio.pack(anchor=W)#锚选项，当可用空间大于所需求的尺寸时，决定组件被放置于容器的何处
-
-
-		#第三行
-		Button(row1, text="取消", command=self.cancel).pack(side=RIGHT)
-		Button(row1, text="提交", command=self.ok).pack(side=RIGHT)
-		#第4行，
-		self.label = Label(self)
-		self.label.pack()
-	def sel(self):
-		selection = "你选择了第{0}首歌".format(str(self.r.get()))
-		self.label.config(text=selection)
-
-	def cancel(self):
-		self.destroy()
-	def ok(self):
-		print(self.r.get())
-		self.destroy()
-		return
-
+seq_selected = []
 def users_choice(song_lst):
+
 	print("请选择:")
-	root=ChooseApp(song_lst)
+	root=Tk()
+	#第1行
+	row1 = Frame(root)
+	row1.pack(fill="x", side=TOP)
+	Label(row1, text='找到相关歌曲' + str(len(song_lst)) + '首，请选择：', width=28, font=("黑体", 16, "bold")).pack(side=LEFT)
+	#第2行
+	scrollbar = Scrollbar(root)
+	scrollbar.pack(side=RIGHT, fill=X)
+	mylist = Listbox(root, yscrollcommand=scrollbar.set, selectmode=MULTIPLE)
+	for i, song in enumerate(song_lst):
+		mylist.insert(END, '{0}：{1} by {2}({3})'.format(i, song[1], song[2], song[3]))
+		mylist.pack(side=LEFT, fill=BOTH)
+	scrollbar.config(command=mylist.yview)
+	#第一行
+
+	def cancel():
+		root.destroy()
+	def ok():
+		global seq_selected
+		seq_selected = mylist.curselection()
+		root.destroy()
+
+
+	button1=Button(row1, text="取消", command=cancel).pack(side=RIGHT)
+	button2=Button(row1, text="提交", command=ok).pack(side=RIGHT)
 	root.mainloop()
-	return int(root.r.get())
+
+	return
 
 #return item
 #先假设用户选择了第一个
@@ -88,9 +69,13 @@ def find_songname(songname):
 		print(song)
 	#呈现给用户，让用户选择
 	print('调用tk展示song_lst,让用户选择')
-	song_seq=users_choice(song_lst)
-	print('在tk中，用户选择了：',song_seq)
-	song_id = song_lst[song_seq][0]
+	users_choice(song_lst)
+	global seq_selected
+	print('在tk中，用户选择了：',seq_selected)
+	song_id=[]
+	#TypeError: 'tuple' object is not callable
+	for seq in seq_selected:
+		song_id.append(song_lst[seq][0])
 	return song_id
 
 
@@ -136,11 +121,7 @@ def input_songname():
 if __name__=='__main__':
 	print('请输入歌名')
 	song_name=input_songname()
-	#print('用户已输入：',song_name)
+	print('用户已输入：',song_name)
 	print("下面开始查找相关歌曲")
 	song_id=find_songname(song_name)
 	print("已经拿到songid,song_id=",song_id)
-	#songname='鼓楼'
-	#song_id=find_songname(songname)
-	#print("with songname='鼓楼',song_id=",song_id)
-	#users_choice([[1,2,3,4],[5,6,7,8]])
