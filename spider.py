@@ -5,6 +5,7 @@ from Crypto.Cipher import AES
 import base64
 import codecs
 import mysql.connector
+import find_songname
 
 
 def aesEncrypt(text, secKey):
@@ -116,6 +117,7 @@ def get_and_save_top_keywords(songid):
 	print('爬取部分已经完成')
 	for i,comment in comments_lst:
 		# print(comment)#[0, '一听就着了迷']
+		global comment_base_index
 		try:
 			save_comment(i,comment,songid)
 		except Exception as e:
@@ -124,6 +126,7 @@ def get_and_save_top_keywords(songid):
 		else:
 			print("comment保存成功：",i, comment)
 		# 保存的同时当场解析
+
 		try:
 			key_words = parse_words(comment)
 			for key_word in key_words:
@@ -137,6 +140,7 @@ def get_and_save_top_keywords(songid):
 		finally:
 			print()
 	print('所有评论的解析与保存已完成')
+	comment_base_index=int(comment_base_index)+len(comments_lst)
 	print(sorted(dic2str(dic_keywords)))
 	top_keywords = list(sorted(dic2str(dic_keywords), key=lambda x: -x[1]))[:10]
 	print('下面开始保存top_keywords到数据库')
@@ -164,7 +168,7 @@ def init_tables():
 	conn.commit()
 	cursor.close()
 
-
+comment_base_index=0
 def save_comment(i,comment,songid):
 	#print(comment_lst,songid)#97 [97, '谢谢'] 447926067
 	# 后面再加，如果有其他songid，insert；如果是一个songid第二次运行，update
@@ -173,19 +177,23 @@ def save_comment(i,comment,songid):
 	cursor = conn.cursor()
 	#去掉非法字符，否则入库报错
 	comment=comment.encode('gbk','ignore').decode('gbk')
+	i=int(comment_base_index)+int(i)
 	cursor.execute('insert into 163music.comments(top_id,comment,songid) values (%s,%s,%s) ',
 				   [i,comment,songid])
 	conn.commit()
 	cursor.close()
 
-
+keyword_base_index=0
 def save_to_keywords(songid, top_keywords):
 	conn = mysql.connector.connect(user='root', password='1234', use_unicode=True)
 	# 通常我们在连接MySQL时传入use_unicode=True，让MySQL的DB-API始终返回Unicode
 	cursor = conn.cursor()
+	global keyword_base_index
 	for i, keyword in enumerate(top_keywords):
+		i=i+int(keyword_base_index)
 		cursor.execute('insert into 163music.keywords(top_id, keyword,weight,songid) values (%s, %s,%s, %s)',
 					   [i, keyword[0], keyword[1], songid])
+	keyword_base_index=int(keyword_base_index)+len(top_keywords)
 	conn.commit()
 	cursor.close()
 
@@ -233,11 +241,12 @@ if __name__ == '__main__':
 	print("下面载数据库中新建两张表")
 	init_tables()
 	print("下面开始主流程")
-	songname='鼓楼'
-	songid=get_songid_by_name(songname)
-	songid = '447926067'
-
-	top_keywords = get_and_save_top_keywords(songid)
-	assert top_keywords, 'top_keywords is Null'
-	for i, top_keyword in enumerate(top_keywords):
-		print('top{0}\t{1}\t{2}'.format(i, top_keyword[0], top_keyword[1]))
+	#songname='鼓楼'
+	song_id_lst=find_songname.get_songid_lst()
+	print('下面开始一首一首获取评论')
+	for song_id in song_id_lst:
+		print("下面开始对id为{0}的歌进行爬取和分析".format(song_id))
+		top_keywords = get_and_save_top_keywords(song_id)
+		assert top_keywords, 'top_keywords is Null'
+		for i, top_keyword in enumerate(top_keywords):
+			print('top{0}\t{1}\t{2}'.format(i, top_keyword[0], top_keyword[1]))
