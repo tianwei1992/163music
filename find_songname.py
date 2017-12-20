@@ -12,17 +12,19 @@ def users_choice(song_lst):
 	#第1行
 	row1 = Frame(root)
 	row1.pack(fill="x", side=TOP)
-	Label(row1, text='找到相关歌曲' + str(len(song_lst)) + '首，请选择：', width=28, font=("黑体", 16, "bold")).pack(side=LEFT)
+	Label(row1, text='找到相关歌曲' + str(len(song_lst)) + '首，请选择：', width=40, font=("宋体", 16, "bold")).pack(side=LEFT)
 	#第2行
-	scrollbar = Scrollbar(root)
-	scrollbar.pack(side=RIGHT, fill=X)
-	mylist = Listbox(root, yscrollcommand=scrollbar.set, selectmode=MULTIPLE)
+	#row2 = Frame(root,bg='yellow')
+	#row2.pack(fill="x", side=TOP)
+	scrollbar = Scrollbar(root,orient = VERTICAL)
+	scrollbar.pack(side=LEFT,fill=Y)
+	mylist = Listbox(root, yscrollcommand=scrollbar.set, selectmode=MULTIPLE,width=80)
 	for i, song in enumerate(song_lst):
-		mylist.insert(END, '{0}：{1} by {2}({3})'.format(i, song[1], song[2], song[3]))
-		mylist.pack(side=LEFT, fill=BOTH)
+		mylist.insert(END, '{0}：{1} by {2} ({3})'.format(i, song[1], song[2], song[3]))
+	mylist.pack(side=LEFT, fill=X)
 	scrollbar.config(command=mylist.yview)
-	#第一行
 
+	#第一行
 	def cancel():
 		root.destroy()
 	def ok():
@@ -61,8 +63,8 @@ def find_songname(songname):
 	#print(text)
 	#用正则提取歌曲信息，保存到song_lst
 	pat = re.compile(
-		r'<div cla.*?song_(.*?)" cla.*?b title="(.*?)">.*?artist.*?>(.*?)</a>.*?album.*?le="(.*?)">.*?</div>')
-	# pat=r'<div class="item.*?<a id="song_(.*?)" class="ply.*?><b title="(.*?).*?artist?id=.*?>(.*?)</a></div>.*?title="(.*?).*?</div></div>'
+		r'<div cla.*?song_(.*?)" cla.*?b title="(.*?)">.*?artist.*?\d+">([^<][^s].*?)</.*?album.*?le="(.*?)">.*?</div>')
+	# pat=r'<div class="item.*?<a id="song_(.*?)" class="ply.*?><b title="(.*?).*?artist?id=.*?>([^s].*?)</a></div>.*?title="(.*?).*?</div></div>'
 	song_lst = pat.findall(text, re.S)
 	print('展示相关歌曲{0}首'.format(len(song_lst)))
 	for song in song_lst:
@@ -117,11 +119,17 @@ def input_songname():
 	return song_name
 
 
+def get_songid_lst():
+	print('请输入歌名')
+	song_name = input_songname()
+	print('用户已输入：', song_name)
+	print("下面开始查找相关歌曲")
+	song_id = find_songname(song_name)
+	assert song_id, '用户没有选择，请重新启动'
+	print("已经拿到songid,song_id=", song_id)
+	return song_id
 
 if __name__=='__main__':
-	print('请输入歌名')
-	song_name=input_songname()
-	print('用户已输入：',song_name)
-	print("下面开始查找相关歌曲")
-	song_id=find_songname(song_name)
-	print("已经拿到songid,song_id=",song_id)
+	get_songid_lst()
+
+	#users_choice([[1,2,3,4],[5,6,7,8]])
