@@ -2,6 +2,7 @@ from tkinter import *
 import tkinter.messagebox as messagebox
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+import mysql.connector
 import time
 
 seq_selected = []
@@ -49,6 +50,9 @@ def find_songname(songname):
 	url = 'http://music.163.com/#/search/m/'
 	browser.get(url)
 	#先定位到g-iframe这个frame
+	#加入等待，免得网速不好时总是发生异常
+
+	WebDriverWait(browser, 10).until(lambda driver: driver.find_element_by_class_name("g-iframe"))
 	frame1 = browser.find_element_by_css_selector(".g-iframe")
 	browser.switch_to.frame(frame1)
 	# 再定位到输入框，输入songname
@@ -74,11 +78,12 @@ def find_songname(songname):
 	users_choice(song_lst)
 	global seq_selected
 	print('在tk中，用户选择了：',seq_selected)
-	song_id=[]
+	songs_selected=[]
 	#TypeError: 'tuple' object is not callable
 	for seq in seq_selected:
-		song_id.append(song_lst[seq][0])
-	return song_id
+		#返回songid+title+singer+album
+		songs_selected.append([song_lst[seq][0],song_lst[seq][1],song_lst[seq][2],song_lst[seq][3]])
+	return songs_selected
 
 
 class InputApp(Tk):
@@ -118,18 +123,44 @@ def input_songname():
 	song_name=root.song_name.get()
 	return song_name
 
+def save_to_songs(songs_selected):
+	conn = mysql.connector.connect(user='root', password='1234', use_unicode=True)
+	cursor = conn.cursor()
+	for song_selected in songs_selected:
+		print(song_selected)
+		try:
+			cursor.execute('insert into 163music.songs(songid,title,singer,album) values (%s, %s,%s, %s)',
+					   [song_selected[0], song_selected[1], song_selected[2], song_selected[3]])
+		except Exception as e:
+			print('songs保存失败',song_selected)
+			print(e)
+	conn.commit()
+	cursor.close()
+
+
+
+
 
 def get_songid_lst():
 	print('请输入歌名')
 	song_name = input_songname()
 	print('用户已输入：', song_name)
 	print("下面开始查找相关歌曲")
-	song_id = find_songname(song_name)
-	assert song_id, '用户没有选择，请重新启动'
-	print("已经拿到songid,song_id=", song_id)
-	return song_id
+	songs_selected = find_songname(song_name)
+	assert len(songs_selected), '用户没有选择，请重新启动'
+	print("用户已选择{0}项，下面保存至songs表……".format(len(songs_selected)))
+	save_to_songs(songs_selected)
+	print('songs保存成功！')
+	for song_selected in songs_selected:
+		print(song_selected[0])
+	return songs_selected
+
+
+
+
+
+
 
 if __name__=='__main__':
 	get_songid_lst()
-
 	#users_choice([[1,2,3,4],[5,6,7,8]])

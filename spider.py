@@ -116,8 +116,7 @@ def get_and_save_top_keywords(songid):
 	assert comments_lst, 'comments_lst is Null'
 	print('爬取部分已经完成')
 	for i,comment in comments_lst:
-		# print(comment)#[0, '一听就着了迷']
-		global comment_base_index
+		# print(comment)#[0, '一听就着了迷'
 		try:
 			save_comment(i,comment,songid)
 		except Exception as e:
@@ -140,7 +139,6 @@ def get_and_save_top_keywords(songid):
 		finally:
 			print()
 	print('所有评论的解析与保存已完成')
-	comment_base_index=int(comment_base_index)+len(comments_lst)
 	print(sorted(dic2str(dic_keywords)))
 	top_keywords = list(sorted(dic2str(dic_keywords), key=lambda x: -x[1]))[:10]
 	print('下面开始保存top_keywords到数据库')
@@ -158,17 +156,30 @@ def init_tables():
 	conn = mysql.connector.connect(user='root', password='1234', use_unicode=True)
 	# 通常我们在连接MySQL时传入use_unicode=True，让MySQL的DB-API始终返回Unicode
 	cursor = conn.cursor()
-	# 如果是第二次运行，先把第一次的结果删掉
-	cursor.execute('drop database if exists ' + '163music')
 	cursor.execute('create database if not exists ' + '163music')
 	cursor.execute(
-		'create table if not exists 163music.comments(top_id varchar(10) primary key, comment varchar(200),songid varchar(20))')
+		'create table if not exists 163music.songs(id TINYINT primary key auto_increment, title varchar(50),singer varchar(50),album varchar(50),songid varchar(10) unique);')
+
 	cursor.execute(
-		'create table if not exists 163music.keywords(top_id varchar(10) primary key, keyword varchar(10),weight varchar(20),songid varchar(20))')
+		'create table if not exists 163music.comments(id INT primary key auto_increment, content varchar(500),songid varchar(10),seq tinyint,foreign key(songid) references 163music.songs(songid) on delete cascade);')
+	cursor.execute(
+		'alter table 163music.comments add unique index(songid,seq);'
+	)
+
+
+	cursor.execute(
+		'create table if not exists 163music.keywords(id int primary key auto_increment, keyword varchar(20),weight float(5.2),songid varchar(10),seq tinyint,foreign key(songid) references 163music.songs(songid) on delete cascade);')
+	cursor.execute(
+		'alter table 163music.keywords add unique index(songid,seq);'
+	)
+	cursor.execute(
+		'use 163music;'
+	)
+
 	conn.commit()
 	cursor.close()
 
-comment_base_index=0
+
 def save_comment(i,comment,songid):
 	#print(comment_lst,songid)#97 [97, '谢谢'] 447926067
 	# 后面再加，如果有其他songid，insert；如果是一个songid第二次运行，update
@@ -177,23 +188,37 @@ def save_comment(i,comment,songid):
 	cursor = conn.cursor()
 	#去掉非法字符，否则入库报错
 	comment=comment.encode('gbk','ignore').decode('gbk')
-	i=int(comment_base_index)+int(i)
-	cursor.execute('insert into 163music.comments(top_id,comment,songid) values (%s,%s,%s) ',
-				   [i,comment,songid])
+	#首先默认是对已存在更新，如果更新找不到再insert
+	try:
+		cursor.execute('replace into 163music.comments(seq,content,songid) values (%s,%s,%s) ',
+					   [i, comment, songid])
+
+	except:
+		print("comment保存失败：", i, comment)
+		#cursor.execute('update 163music.comments set content=%s where songid=%s and seq=%s',
+#					   [comment, songid, i])
+	else:
+		print("comment保存成功：", i, comment)
 	conn.commit()
 	cursor.close()
 
-keyword_base_index=0
 def save_to_keywords(songid, top_keywords):
 	conn = mysql.connector.connect(user='root', password='1234', use_unicode=True)
 	# 通常我们在连接MySQL时传入use_unicode=True，让MySQL的DB-API始终返回Unicode
 	cursor = conn.cursor()
-	global keyword_base_index
 	for i, keyword in enumerate(top_keywords):
-		i=i+int(keyword_base_index)
-		cursor.execute('insert into 163music.keywords(top_id, keyword,weight,songid) values (%s, %s,%s, %s)',
+		try:
+			cursor.execute('replace into 163music.keywords(seq,keyword,weight,songid) values (%s, %s,%s, %s)',
 					   [i, keyword[0], keyword[1], songid])
-	keyword_base_index=int(keyword_base_index)+len(top_keywords)
+
+		except:
+			print('keyword 保存失败',i,keyword)
+			#cursor.execute('update 163music.keywords set keyword=%s,weight=%s where songid=%s and seq=%s',
+#						   [keyword[0], keyword[1], songid, i])
+
+		else:
+			print('keyword 保存成功！')
+
 	conn.commit()
 	cursor.close()
 
@@ -233,20 +258,46 @@ def get_songid_by_name(songname):
 		print()
 
 
+def get_comments_from_db(singer):
+	try:
+		cursor.execute('select comments.content from comments,songs where songs.songid==comments.songid and songs.singer=%s',
+					   [singer])
+		#查询的结果如何传递给python？
+		print("歌手{0}，共查到{1}首歌".format(singer,))
 
+	except:
+		print('歌手{0}的评论查询失败', singer)
+	# cursor.execute('update 163music.keywords set keyword=%s,weight=%s where songid=%s and seq=%s',
+	#						   [keyword[0], keyword[1], songid, i])
+
+	else:
+		print('keyword 保存成功！')
+
+
+
+def calcu_keywords(singer):
+	comments=get_comments_from_db(singer)
+	#直接调用现成的模块，不需要自己再写
+	keywords=parse_words(comments)
+	return keywords
 
 
 if __name__ == '__main__':
 	# 在数据库中新建两张表，comments和keywords
-	print("下面载数据库中新建两张表")
+	print("下面载数据库中新建3张表")
 	init_tables()
 	print("下面开始主流程")
 	#songname='鼓楼'
-	song_id_lst=find_songname.get_songid_lst()
+	songs_selected=find_songname.get_songid_lst()
 	print('下面开始一首一首获取评论')
-	for song_id in song_id_lst:
-		print("下面开始对id为{0}的歌进行爬取和分析".format(song_id))
+	for song_selected in songs_selected:
+		#song_selected是一个list，依次包含songid,title,singer,album
+		song_id=song_selected[0]
+		print("下面开始对id为{0}的歌进行爬取和分析".format(song_id)   )
 		top_keywords = get_and_save_top_keywords(song_id)
 		assert top_keywords, 'top_keywords is Null'
 		for i, top_keyword in enumerate(top_keywords):
 			print('top{0}\t{1}\t{2}'.format(i, top_keyword[0], top_keyword[1]))
+
+	keywords=calcu_keywords(singer)
+	print(keywords)
