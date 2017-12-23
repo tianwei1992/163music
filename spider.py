@@ -5,6 +5,7 @@ from Crypto.Cipher import AES
 import base64
 import codecs
 import mysql.connector
+#import MySQLdb
 import find_songname
 
 
@@ -95,13 +96,13 @@ import pynlpir
 def parse_words(s):
 	pynlpir.open()
 	#print(type(s))#<class 'str'>
-	#print(s)
+	print(s)
 	key_words = pynlpir.get_key_words(s, weighted=True)
 	pynlpir.close()
 	return key_words
 
 
-def dic2str(dicc):
+def dic2lst(dicc):
 	lst = []
 	for key in dicc:
 		lst.append((key, dicc[key]))
@@ -139,8 +140,8 @@ def get_and_save_top_keywords(songid):
 		finally:
 			print()
 	print('所有评论的解析与保存已完成')
-	print(sorted(dic2str(dic_keywords)))
-	top_keywords = list(sorted(dic2str(dic_keywords), key=lambda x: -x[1]))[:10]
+	print(sorted(dic2lst(dic_keywords)))
+	top_keywords = list(sorted(dic2lst(dic_keywords), key=lambda x: -x[1]))[:10]
 	print('下面开始保存top_keywords到数据库')
 	try:
 		save_to_keywords(songid, top_keywords)
@@ -166,7 +167,6 @@ def init_tables():
 		'alter table 163music.comments add unique index(songid,seq);'
 	)
 
-
 	cursor.execute(
 		'create table if not exists 163music.keywords(id int primary key auto_increment, keyword varchar(20),weight float(5.2),songid varchar(10),seq tinyint,foreign key(songid) references 163music.songs(songid) on delete cascade);')
 	cursor.execute(
@@ -175,6 +175,7 @@ def init_tables():
 	cursor.execute(
 		'use 163music;'
 	)
+	mysql_set_charset('utf8mb4');
 
 	conn.commit()
 	cursor.close()
@@ -260,29 +261,47 @@ def get_songid_by_name(songname):
 
 def get_comments_from_db(singer):
 	try:
-		cursor.execute('select comments.content from comments,songs where songs.songid==comments.songid and songs.singer=%s',
-					   [singer])
-		#查询的结果如何传递给python？
-		print("歌手{0}，共查到{1}首歌".format(singer,))
-
-	except:
-		print('歌手{0}的评论查询失败', singer)
-	# cursor.execute('update 163music.keywords set keyword=%s,weight=%s where songid=%s and seq=%s',
-	#						   [keyword[0], keyword[1], songid, i])
-
-	else:
-		print('keyword 保存成功！')
+		conn = mysql.connector.connect(user='root', password='1234', use_unicode=True)
+		# 通常我们在连接MySQL时传入use_unicode=True，让MySQL的DB-API始终返回Unicode
+		cursor = conn.cursor()
+		cursor.execute(
+			'use 163music;'
+		)
+		query = "select comments.content from comments,songs where comments.songid=songs.songid and songs.singer='{0}';" .format(singer)
+		cursor.execute(query)
+		comments_lst=list(cursor)
+		for i,comment in enumerate(comments_lst):
+			print(i,comment)
+		print("comments查询成功!歌手:{0}，共查到{1}条评论".format(singer,len(comments_lst)))
+		return comments_lst
+	except Exception as e:
+		print('comments查询失败！歌手:{0}'.format(singer))
+		print(e)
 
 
 
 def calcu_keywords(singer):
-	comments=get_comments_from_db(singer)
+	comments_lst=get_comments_from_db(singer)
 	#直接调用现成的模块，不需要自己再写
-	keywords=parse_words(comments)
-	return keywords
+	dic_keywords = {}
+	for comment in comments_lst:
+		#对每个comment：首先解析出key_words及其weighth,然后把他们加入总字典dic_keywords
+		try:
+			key_words=parse_words(comment[0])
+			print('key_words==',key_words)#[('没错', 2.0)]
+			for key_word in key_words:
+				#print(key_word)#('没错', 2.0)
+				dic_keywords.update({key_word[0]: dic_keywords.get(key_word[0], 0) + key_word[1]})
+			print('当前评论分析成功',comment[0])
+		except Exception as e:
+			print('当前评论分析失败',comment)
+			print(e)
+	#print('dic_keywords=',dic_keywords)
+	return (dic_keywords)
 
 
 if __name__ == '__main__':
+	"""
 	# 在数据库中新建两张表，comments和keywords
 	print("下面载数据库中新建3张表")
 	init_tables()
@@ -298,6 +317,9 @@ if __name__ == '__main__':
 		assert top_keywords, 'top_keywords is Null'
 		for i, top_keyword in enumerate(top_keywords):
 			print('top{0}\t{1}\t{2}'.format(i, top_keyword[0], top_keyword[1]))
+		"""
+	dic_keywords=calcu_keywords('赵雷')
+	top_keywords = list(sorted(dic2lst(dic_keywords), key=lambda x: -x[1]))[:10]
+	for top_keyword in top_keywords:
+		print(top_keyword)
 
-	keywords=calcu_keywords(singer)
-	print(keywords)
