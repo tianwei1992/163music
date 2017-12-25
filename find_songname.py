@@ -1,13 +1,12 @@
 from tkinter import *
-import tkinter.messagebox as messagebox
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 import mysql.connector
-import time
 
+
+#定义全局变量seq_selected，用于保存用户选择
 seq_selected = []
 def users_choice(song_lst):
-
 	print("请选择:")
 	root=Tk()
 	#第1行
@@ -15,8 +14,7 @@ def users_choice(song_lst):
 	row1.pack(fill="x", side=TOP)
 	Label(row1, text='找到相关歌曲' + str(len(song_lst)) + '首，请选择：', width=40, font=("宋体", 16, "bold")).pack(side=LEFT)
 	#第2行
-	#row2 = Frame(root,bg='yellow')
-	#row2.pack(fill="x", side=TOP)
+	#Scrollbar+Listbox
 	scrollbar = Scrollbar(root,orient = VERTICAL)
 	scrollbar.pack(side=LEFT,fill=Y)
 	mylist = Listbox(root, yscrollcommand=scrollbar.set, selectmode=MULTIPLE,width=80)
@@ -25,47 +23,40 @@ def users_choice(song_lst):
 	mylist.pack(side=LEFT, fill=X)
 	scrollbar.config(command=mylist.yview)
 
-	#第一行
+	#第3行
 	def cancel():
 		root.destroy()
 	def ok():
 		global seq_selected
 		seq_selected = mylist.curselection()
 		root.destroy()
-
-
 	button1=Button(row1, text="取消", command=cancel).pack(side=RIGHT)
 	button2=Button(row1, text="提交", command=ok).pack(side=RIGHT)
 	root.mainloop()
-
 	return
-
-#return item
-#先假设用户选择了第一个
+	#没有返回
 
 def find_songname(songname):
+	#用selenium定位输入框，避免了构造用于post的dataform
 	browser = webdriver.Chrome()
-	#最小化窗口，因为用户不关心过程
-	#browser.minimize_window()报错Message: unknown command: session/67b6fb8a56cad99cc5646646267e71c4/window/minimize
 	url = 'http://music.163.com/#/search/m/'
 	browser.get(url)
-	#先定位到g-iframe这个frame
-	#加入等待，免得网速不好时总是发生异常
-
+	#加入等待，免得网速原因导致加载缓慢时报异常
 	WebDriverWait(browser, 10).until(lambda driver: driver.find_element_by_class_name("g-iframe"))
+	#先切换到class=g-iframe这个frame，才能进一步定位到其中的元素
 	frame1 = browser.find_element_by_css_selector(".g-iframe")
 	browser.switch_to.frame(frame1)
-	# 再定位到输入框，输入songname
+	# 定位到输入框，输入songname
 	browser.find_element_by_id("m-search-input").send_keys(songname)
-	#再定位到搜索按钮，点击
+	#定位到搜索按钮，click
 	browser.find_element_by_css_selector(".btn").click()
-	# 必须等待，否则网页还没开始加载
+	# 再次等待页面加载和渲染完毕
 	WebDriverWait(browser, 10).until(lambda driver: driver.find_element_by_class_name("srchsongst"))
-	#拿到渲染后的网页，
+	#拿到渲染后的网页html代码，保存至text
 	text = browser.page_source
 	browser.close()
-	#print(text)
-	#用正则提取歌曲信息，保存到song_lst
+	#构造正则，用于从text中提取歌曲信息，保存到song_lst
+	#歌曲信息包括songid+title+singer+album
 	pat = re.compile(
 		r'<div cla.*?song_(.*?)" cla.*?b title="(.*?)">.*?artist.*?\d+">([^<][^s].*?)</.*?album.*?le="(.*?)">.*?</div>')
 	# pat=r'<div class="item.*?<a id="song_(.*?)" class="ply.*?><b title="(.*?).*?artist?id=.*?>([^s].*?)</a></div>.*?title="(.*?).*?</div></div>'
@@ -73,13 +64,13 @@ def find_songname(songname):
 	print('展示相关歌曲{0}首'.format(len(song_lst)))
 	for song in song_lst:
 		print(song)
-	#呈现给用户，让用户选择
+	#调用tk呈现给用户，让用户选择
 	print('调用tk展示song_lst,让用户选择')
 	users_choice(song_lst)
-	global seq_selected
+	#拿到用户选择序号
 	print('在tk中，用户选择了：',seq_selected)
+	#从所选序号还原出完整歌曲信息，返回
 	songs_selected=[]
-	#TypeError: 'tuple' object is not callable
 	for seq in seq_selected:
 		#返回songid+title+singer+album
 		songs_selected.append([song_lst[seq][0],song_lst[seq][1],song_lst[seq][2],song_lst[seq][3]])
@@ -117,28 +108,26 @@ class InputApp(Tk):
 
 
 def input_songname():
-	#1创建root主窗口
+	#调用tk窗口，供用户输入歌曲名，保存至song_name返回
 	root = InputApp()
-	root.mainloop()#为什么开两个
+	root.mainloop()
 	song_name=root.song_name.get()
 	return song_name
 
-def save_to_songs(songs_selected):
+def save_to_songs(song_list):
+	#把歌曲信息保存到数据库songs表
 	conn = mysql.connector.connect(user='root', password='1234', use_unicode=True)
 	cursor = conn.cursor()
-	for song_selected in songs_selected:
-		print(song_selected)
+	for song in song_list:
+		print(song)
 		try:
 			cursor.execute('insert into 163music.songs(songid,title,singer,album) values (%s, %s,%s, %s)',
-					   [song_selected[0], song_selected[1], song_selected[2], song_selected[3]])
+					   [song[0], song[1], song[2], song[3]])
 		except Exception as e:
-			print('songs保存失败',song_selected)
+			print('songs保存失败',song)
 			print(e)
 	conn.commit()
 	cursor.close()
-
-
-
 
 
 def get_songid_lst():
@@ -156,11 +145,6 @@ def get_songid_lst():
 	return songs_selected
 
 
-
-
-
-
-
 if __name__=='__main__':
+	#启动本模块的主流程，可以遍历本模块的所有函数
 	get_songid_lst()
-	#users_choice([[1,2,3,4],[5,6,7,8]])
